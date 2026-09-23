@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || origin).replace(/\/$/, '')
   const code = searchParams.get('code')
   const next = searchParams.get('next') || '/tickets'
 
@@ -11,9 +12,9 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       const safeNext = next.startsWith('/') ? next : '/tickets'
-      return NextResponse.redirect(`${origin}${safeNext}`)
+      return NextResponse.redirect(`${siteUrl}${safeNext}`)
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=google`)
+  return NextResponse.redirect(`${siteUrl}/login?error=google`)
 }

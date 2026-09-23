@@ -38,14 +38,22 @@ The supported games are defined in `lib/games.ts`. Registration and ticket data 
 
    On PowerShell, use `Copy-Item .env.local.example .env.local` instead.
 
-4. Add the Supabase URL and anon key to `.env.local`. Never commit this file.
+4. Add the Supabase URL, anon key, and site URL to `.env.local`. Never commit this file.
+
+   For local development:
+
+   ```env
+   NEXT_PUBLIC_SITE_URL=http://localhost:3000
+   ```
+
+   For production, set it to `https://es.asci-gvpce.in` without a trailing slash.
 
 5. In Authentication → Providers, enable **Google** (disable Email if you want Google-only).
 
 6. Add these Redirect URLs in Authentication → URL Configuration:
 
    - `http://localhost:3000/auth/callback`
-   - your production callback, e.g. `https://your-domain/auth/callback`
+   - `https://es.asci-gvpce.in/auth/callback`
 
 7. In Google Cloud Console, create OAuth credentials and paste the Client ID and secret into the Supabase Google provider.
 
@@ -72,7 +80,7 @@ npm start
 
 ## Deployment
 
-Deploy as a Next.js application on Vercel or another Node-compatible host. Configure the same environment variables from `.env.local` in the host dashboard, then add the production `/auth/callback` URL to both Supabase and Google OAuth settings.
+Deploy as a Next.js application on Vercel or another Node-compatible host. Configure the same environment variables from `.env.local` in the host dashboard, with `NEXT_PUBLIC_SITE_URL=https://es.asci-gvpce.in`, then add the production `/auth/callback` URL to both Supabase and Google OAuth settings.
 
 ## Registration rules
 
