@@ -30,7 +30,9 @@ function LoginPanel() {
     setLoading(true)
     try {
       const supabase = createClient()
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (
+        process.env.NODE_ENV === 'production' ? 'https://es.asci-gvpce.in' : window.location.origin
+      )
       const redirectTo = `${siteUrl.replace(/\/$/, '')}/auth/callback?next=${encodeURIComponent(next)}`
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',

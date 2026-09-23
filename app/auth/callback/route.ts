@@ -3,7 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || origin).replace(/\/$/, '')
+  const siteUrl = (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.NODE_ENV === 'production' ? 'https://es.asci-gvpce.in' : origin)
+  ).replace(/\/$/, '')
   const code = searchParams.get('code')
   const next = searchParams.get('next') || '/tickets'
 
