@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --gradient-page: radial-gradient(circle at 50% 20%, #0B1C32 0%, #050B14 42%, #02050A 100%);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply text-ink font-body antialiased;
+    background: var(--gradient-page);
+    background-attachment: fixed;
+    min-width: 320px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display font-bold tracking-wide;
+  }
+
+  p {
+    @apply text-muted leading-relaxed;
+  }
+
+  :focus-visible {
+    @apply outline outline-2 outline-accent-bright outline-offset-2;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Small set of effects that aren't practical as plain utility classes:
+   dynamic per-game color mixing, background patterns, and blurred glows. */
+@layer components {
+  .bg-grid-pattern {
+    background-image: linear-gradient(rgba(0, 191, 255, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 191, 255, 0.1) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 20%, black 0%, transparent 75%);
+  }
+
+  .bg-scanlines {
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.02) 0px,
+      rgba(255, 255, 255, 0.02) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  }
+
+  .neon-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.7), rgba(255, 69, 69, 0.5), transparent);
+  }
+
+  /* Game-card active state uses a CSS var (--game-color) set inline per card,
+     since the color is data-driven and can't be a static Tailwind class. */
+  .game-card-active {
+    border-color: var(--game-color);
+    box-shadow: 0 0 0 1px var(--game-color) inset, 0 24px 48px -32px var(--game-color);
+  }
+
+  .game-tag-outline {
+    color: var(--game-color);
+    border-color: color-mix(in srgb, var(--game-color) 50%, transparent);
+  }
+
+  .game-logo-tile {
+    background: color-mix(in srgb, var(--logo-color) 18%, transparent);
+    border-color: color-mix(in srgb, var(--logo-color) 45%, transparent);
+    color: var(--logo-color);
+  }
+
+  .rule-icon-tile {
+    background: color-mix(in srgb, currentColor 16%, transparent);
+    border-color: color-mix(in srgb, currentColor 40%, transparent);
+  }
+
+  .cinematic-frame {
+    position: relative;
+    isolation: isolate;
+    background:
+      linear-gradient(145deg, rgba(11, 29, 49, 0.72), rgba(3, 7, 13, 0.9)),
+      radial-gradient(circle at 70% 35%, rgba(0, 140, 255, 0.16), transparent 52%),
+      radial-gradient(circle at 90% 80%, rgba(255, 69, 69, 0.09), transparent 40%);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .cinematic-frame::before,
+  .cinematic-frame::after {
+    position: absolute;
+    z-index: -1;
+    content: '';
+    pointer-events: none;
+  }
+
+  .cinematic-frame::before {
+    inset: 10px;
+    border: 1px solid rgba(0, 217, 255, 0.16);
+    clip-path: polygon(0 0, 30px 0, 30px 1px, calc(100% - 30px) 1px, calc(100% - 30px) 0, 100% 0, 100% 30px, calc(100% - 1px) 30px, calc(100% - 1px) calc(100% - 30px), 100% calc(100% - 30px), 100% 100%, calc(100% - 30px) 100%, calc(100% - 30px) calc(100% - 1px), 30px calc(100% - 1px), 30px 100%, 0 100%, 0 calc(100% - 30px), 1px calc(100% - 30px), 1px 30px, 0 30px);
+  }
+
+  .cinematic-frame::after {
+    inset: 0;
+    background: repeating-linear-gradient(115deg, transparent 0 38px, rgba(0, 217, 255, 0.025) 39px 40px, transparent 41px 82px);
+    opacity: 0.7;
+  }
+
+  .hud-label {
+    font-family: var(--font-display), sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .cinematic-card {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(145deg, rgba(12, 28, 48, 0.88), rgba(4, 9, 16, 0.94));
+  }
+
+  .cinematic-card::after {
+    position: absolute;
+    inset: 0;
+    content: '';
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 0 58%, rgba(255, 69, 69, 0.055) 72%, transparent 88%);
+    opacity: 0.75;
+  }
+
+  .scanline-shift {
+    animation: scanline-shift 8s linear infinite;
+  }
+
+  @keyframes scanline-shift {
+    from { background-position: 0 0; }
+    to { background-position: 0 80px; }
+  }
+}
