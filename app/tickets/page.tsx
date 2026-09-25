@@ -2,14 +2,20 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Ticket as TicketIcon, Users } from 'lucide-react'
+import { ArrowRight, ExternalLink, Ticket as TicketIcon, Users } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import GameLogo from '@/components/GameLogo'
 import { useAuth } from '@/components/AuthProvider'
 import { createClient } from '@/lib/supabase/client'
-import { games, gameKeys } from '@/lib/games'
+import { games, gameKeys, type GameKey } from '@/lib/games'
 import type { Ticket } from '@/lib/types'
+
+const groupLinks: Record<GameKey, string> = {
+  freefire: 'https://chat.whatsapp.com/DVFvGHTBbk1ClQDkY69rka',
+  bgmi: 'https://chat.whatsapp.com/LgJcYTRbIXF4kDdBCQeXBT',
+  codm: 'https://chat.whatsapp.com/LgJcYTRbIXF4kDdBCQeXBT',
+}
 
 export default function TicketsPage() {
   const { user, loading: authLoading } = useAuth()
@@ -117,6 +123,14 @@ export default function TicketsPage() {
                           </li>
                         ))}
                       </ul>
+                      <a
+                        href={groupLinks[key]}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-auto inline-flex items-center justify-center gap-2 rounded-control border border-accent/40 bg-accent-soft px-5 py-3 font-display text-[14px] font-semibold text-accent-bright transition-colors hover:border-accent-bright"
+                      >
+                        Join Group <ExternalLink size={16} />
+                      </a>
                     </div>
                   ) : (
                     <div className="relative z-10 flex flex-1 flex-col justify-between gap-4 p-5">
