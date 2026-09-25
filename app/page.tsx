@@ -269,7 +269,7 @@ export default function HomePage() {
                 </div>
                 <div className="relative z-10 flex flex-col gap-2 border-t border-border pt-4 text-[13px] text-muted">
                   <div className="flex items-center gap-2 text-accent-bright">
-                    <Trophy size={14} /> <strong>Top 1:</strong> Rs.600 Cash for 1st Position Squad
+                    <Trophy size={14} /> <strong>Top 1st Squad:</strong> Rs.600 Cash
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted">
                     <span className="inline-flex items-center gap-1.5">
