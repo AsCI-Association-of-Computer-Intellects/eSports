@@ -15,6 +15,8 @@ import { YEARS_OF_STUDY, type Ticket } from '@/lib/types'
 const inputClass =
   'rounded-control border border-border bg-bg-elevated px-3.5 py-3 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none'
 
+const whatsappCommunityUrl = 'https://chat.whatsapp.com/GGsrJqf2yVR0T59xoGXb46'
+
 function CollegeFields({ prefix, required }: { prefix: string; required: boolean }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -53,6 +55,7 @@ export default function RegisterPage() {
 
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [registered, setRegistered] = useState(false)
   const [existing, setExisting] = useState<Ticket | null>(null)
   const [checking, setChecking] = useState(true)
 
@@ -148,8 +151,7 @@ export default function RegisterPage() {
       return
     }
 
-    router.push('/tickets')
-    router.refresh()
+    setRegistered(true)
   }
 
   return (
@@ -179,6 +181,29 @@ export default function RegisterPage() {
             <div className="font-display text-[13px] font-semibold tracking-widest text-accent-bright">TEAM LEADER REGISTRATION</div>
             {authLoading || checking ? (
               <p className="text-sm">Checking your Gmail…</p>
+            ) : registered ? (
+              <>
+                <h2 className="text-[26px] leading-[1.08] sm:text-[32px]">
+                  You&apos;re <em className="not-italic text-accent-bright">in.</em>
+                </h2>
+                <p className="-mt-2.5 text-sm">
+                  Your {game.name} team has been registered successfully. Join the AsCI Esports community on WhatsApp for updates.
+                </p>
+                <a
+                  href={whatsappCommunityUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-accent-gradient px-6 py-3.5 font-display text-[15px] font-semibold text-[#04101f]"
+                >
+                  Join WhatsApp community <ArrowRight size={17} />
+                </a>
+                <Link
+                  href="/tickets"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-6 py-3.5 font-display text-[15px] font-semibold text-ink hover:border-border-strong"
+                >
+                  View tickets <ArrowRight size={17} />
+                </Link>
+              </>
             ) : existing ? (
               <>
                 <h2 className="text-[26px] leading-[1.08] sm:text-[32px]">
