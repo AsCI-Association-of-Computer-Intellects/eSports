@@ -22,7 +22,16 @@ function CollegeFields({ prefix, required }: { prefix: string; required: boolean
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <label className="flex flex-col gap-2 text-[13px] font-semibold text-muted">
         Branch
-        <input name={`${prefix}-branch`} required={required} placeholder="e.g. CSE" className={inputClass} />
+        <select name={`${prefix}-branch`} required={required} defaultValue="" className={inputClass}>
+          <option value="" disabled>
+            Select branch
+          </option>
+          {['CSE', 'IT', 'CSD', 'CSM', 'CSC'].map(branch => (
+            <option key={branch} value={branch}>
+              {branch}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="flex flex-col gap-2 text-[13px] font-semibold text-muted">
         Section
