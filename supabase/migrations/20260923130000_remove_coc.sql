@@ -67,6 +67,14 @@ begin
     raise exception 'This Gmail is already registered for this game. One team per game.';
   end if;
 
+  if exists (
+    select 1 from public.registrations
+    where game_key = p_game_key
+      and lower(in_game_uid) = v_leader_uid
+  ) then
+    raise exception 'UID is already associated with another team for this game.';
+  end if;
+
   insert into public.teams (game_key, team_name, leader_id)
   values (p_game_key, trim(p_team_name), v_user_id)
   returning id into v_team_id;
@@ -95,6 +103,11 @@ begin
     end if;
     if v_uid = any (v_seen_uid) then raise exception 'Each in-game UID can only appear once on a roster'; end if;
     v_seen_uid := array_append(v_seen_uid, v_uid);
+    if exists (
+      select 1 from public.registrations
+      where game_key = p_game_key
+        and lower(in_game_uid) = v_uid
+    ) then raise exception 'UID is already associated with another team for this game.'; end if;
     if v_email = any (v_seen_email) then raise exception 'Each Gmail can only appear once on a roster'; end if;
     v_seen_email := array_append(v_seen_email, v_email);
 

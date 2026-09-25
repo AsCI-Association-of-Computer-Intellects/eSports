@@ -1,16 +1,4 @@
--- Add CODM to the existing tournament without changing registration rules.
-
-do $$
-begin
-  alter table public.teams drop constraint if exists teams_game_key_check;
-  alter table public.teams add constraint teams_game_key_check
-    check (game_key in ('freefire', 'bgmi', 'codm'));
-
-  alter table public.registrations drop constraint if exists registrations_game_key_check;
-  alter table public.registrations add constraint registrations_game_key_check
-    check (game_key in ('freefire', 'bgmi', 'codm'));
-end;
-$$;
+-- Show a specific message when a UID is already used by another team in the same game.
 
 create or replace function public.register_team(
   p_game_key text,
@@ -115,6 +103,7 @@ begin
     ) then
       raise exception 'UID is already associated with another team for this game.';
     end if;
+
     if v_email = any (v_seen_email) then
       raise exception 'Each Gmail can only appear once on a roster';
     end if;
@@ -137,8 +126,7 @@ begin
       team_id, game_key, user_id, in_game_uid, role, email, branch, section, year_of_study
     ) values (
       v_team_id, p_game_key, v_member_user, trim(v_member->>'in_game_uid'), 'member',
-      v_email, trim(v_member->>'branch'), trim(v_member->>'section'),
-      trim(v_member->>'year_of_study')
+      v_email, trim(v_member->>'branch'), trim(v_member->>'section'), trim(v_member->>'year_of_study')
     );
   end loop;
 
