@@ -197,6 +197,36 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Event timeline */}
+      <section className="border-b border-border bg-surface/60 px-5 py-12 sm:px-8 md:py-16 lg:px-16">
+        <div className="mx-auto max-w-[1320px]">
+          <div className="mb-7 flex items-end justify-between gap-5">
+            <div>
+              <div className="font-display text-[13px] font-semibold tracking-widest text-accent-bright">EVENT TIMELINE</div>
+              <h2 className="mt-2 text-[30px] leading-none sm:text-[42px]">Mark the <em className="not-italic text-accent-bright">dates.</em></h2>
+            </div>
+            <Calendar size={28} className="mb-1 hidden text-accent-bright sm:block" />
+          </div>
+          <div className="grid grid-cols-1 gap-px overflow-hidden rounded-card border border-border bg-border sm:grid-cols-2">
+            {[
+              { label: 'REGISTRATION CLOSES', date: 'Sunday, 27 September 2026', time: '11:49 PM' },
+              { label: 'MATCHES BEGIN', date: 'Monday, 28 September 2026', time: '7:00 PM' },
+            ].map(({ label, date, time }, index) => (
+              <div key={label} className="bg-bg-elevated/90 p-5 sm:p-7">
+                <div className="mb-6 flex items-center gap-3">
+                  <span className="font-display text-xs font-bold text-faint">0{index + 1}</span>
+                  <span className="h-px flex-1 bg-border" />
+                  <Calendar size={16} className="text-accent-bright" />
+                </div>
+                <div className="font-display text-[11px] font-bold tracking-[0.18em] text-accent-bright">{label}</div>
+                <div className="mt-2 text-xl font-semibold text-ink sm:text-2xl">{date}</div>
+                <div className="mt-1 font-display text-sm font-bold tracking-wider text-muted">{time}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Team competition */}
       <section className="relative border-b border-border bg-bg-elevated/55 px-5 py-12 sm:px-8 md:py-16 lg:px-16">
         <div className="mx-auto max-w-[1320px]">
