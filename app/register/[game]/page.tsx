@@ -56,6 +56,11 @@ export default function RegisterPage() {
   const [existing, setExisting] = useState<Ticket | null>(null)
   const [checking, setChecking] = useState(true)
 
+  const reportError = (message: string) => {
+    setError(message)
+    window.alert(message)
+  }
+
   const supabase = useMemo(() => {
     try {
       return createClient()
@@ -113,7 +118,7 @@ export default function RegisterPage() {
       const year_of_study = String(formData.get(`member-${i}-year`) || '').trim()
       const required = i < game.rosterSize - 1
       if (required && (!uid || !email || !branch || !section || !year_of_study)) {
-        setError('Fill in Gmail, in-game UID, branch, section, and year for every starting player.')
+        reportError('Fill in Gmail, in-game UID, branch, section, and year for every starting player.')
         return
       }
       if (uid || email) {
@@ -122,7 +127,7 @@ export default function RegisterPage() {
     }
 
     if (!teamName || !leader.in_game_uid) {
-      setError('Team name and your in-game UID are required.')
+      reportError('Team name and your in-game UID are required.')
       return
     }
 
@@ -139,7 +144,7 @@ export default function RegisterPage() {
     setSubmitting(false)
 
     if (registerError) {
-      setError(registerError.message.replace(/^.*ERROR:\s*/i, ''))
+      reportError(registerError.message.replace(/^.*ERROR:\s*/i, ''))
       return
     }
 
