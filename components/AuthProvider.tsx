@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) return
     await supabase.auth.signOut()
     setUser(null)
+    window.location.replace('/')
   }
 
   return <AuthContext.Provider value={{ user, loading, signOut }}>{children}</AuthContext.Provider>
