@@ -227,6 +227,20 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Leaderboard placeholder */}
+      <section id="leaderboard" className="mx-auto max-w-[1320px] px-5 py-12 sm:px-8 md:py-16 lg:px-16">
+        <div className="flex flex-col items-start justify-between gap-5 rounded-panel border border-border bg-surface p-7 sm:flex-row sm:items-center sm:p-9">
+          <div className="flex items-start gap-4">
+            <Trophy size={26} className="mt-1 flex-shrink-0 text-accent-bright" />
+            <div>
+              <div className="font-display text-[13px] font-semibold tracking-widest text-faint">LIVE LEADERBOARD</div>
+              <h2 className="mt-2 text-[28px] leading-none sm:text-[36px]">Will be available as the <em className="not-italic text-accent-bright">matches start.</em></h2>
+            </div>
+          </div>
+          <span className="rounded-full border border-accent/30 bg-accent-soft px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-widest text-accent-bright">Coming soon</span>
+        </div>
+      </section>
+
       {/* Team competition */}
       <section className="relative border-b border-border bg-bg-elevated/55 px-5 py-12 sm:px-8 md:py-16 lg:px-16">
         <div className="mx-auto max-w-[1320px]">
