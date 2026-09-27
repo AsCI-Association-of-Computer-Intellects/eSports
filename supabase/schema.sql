@@ -415,9 +415,12 @@ create table if not exists public.matches (
   title text not null,
   scheduled_at timestamptz not null,
   status text not null default 'scheduled' check (status in ('scheduled', 'live', 'completed', 'cancelled')),
+  winner_team_id uuid references public.teams (id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.matches add column if not exists winner_team_id uuid references public.teams (id) on delete set null;
 
 create table if not exists public.team_scores (
   team_id uuid primary key references public.teams (id) on delete cascade,
@@ -457,6 +460,7 @@ as $$
         'team_id', t.id,
         'team_name', t.team_name,
         'game_key', t.game_key,
+        'team_lead_name', coalesce(leader_profile.display_name, lead.email, 'Team leader'),
         'score', coalesce(s.score, 0)
       )
       order by t.game_key, coalesce(s.score, 0) desc, t.team_name
@@ -465,6 +469,8 @@ as $$
   )
   from public.teams t
   left join public.team_scores s on s.team_id = t.id
+  left join public.registrations lead on lead.team_id = t.id and lead.role = 'leader'
+  left join public.profiles leader_profile on leader_profile.id = lead.user_id
   where p_game_key is null or t.game_key = p_game_key;
 $$;
 
@@ -482,7 +488,8 @@ as $$
         'game_key', m.game_key,
         'title', m.title,
         'scheduled_at', m.scheduled_at,
-        'status', m.status
+        'status', m.status,
+        'winner_team_id', m.winner_team_id
       )
       order by m.scheduled_at
     ),
@@ -538,7 +545,8 @@ begin
           'game_key', m.game_key,
           'title', m.title,
           'scheduled_at', m.scheduled_at,
-          'status', m.status
+          'status', m.status,
+          'winner_team_id', m.winner_team_id
         )
         order by m.scheduled_at
       )
@@ -569,12 +577,15 @@ begin
 end;
 $$;
 
+drop function if exists public.save_match(uuid, text, text, timestamptz, text);
+
 create or replace function public.save_match(
   p_match_id uuid,
   p_game_key text,
   p_title text,
   p_scheduled_at timestamptz,
-  p_status text
+  p_status text,
+  p_winner_team_id uuid default null
 )
 returns uuid
 language plpgsql
@@ -583,6 +594,8 @@ set search_path = public
 as $$
 declare
   v_match_id uuid;
+  v_previous_winner_id uuid;
+  v_previous_status text;
 begin
   if not public.is_admin() then
     raise exception 'Admin access required';
@@ -596,23 +609,49 @@ begin
   if p_status not in ('scheduled', 'live', 'completed', 'cancelled') then
     raise exception 'Unknown match status';
   end if;
+  if p_status = 'completed' and p_winner_team_id is null then
+    raise exception 'Choose the winning team before marking a match complete';
+  end if;
+  if p_winner_team_id is not null and not exists (
+    select 1 from public.teams where id = p_winner_team_id and game_key = p_game_key
+  ) then
+    raise exception 'Winner must be a team registered for this sport';
+  end if;
 
   if p_match_id is null then
-    insert into public.matches (game_key, title, scheduled_at, status)
-    values (p_game_key, trim(p_title), p_scheduled_at, p_status)
+    insert into public.matches (game_key, title, scheduled_at, status, winner_team_id)
+    values (p_game_key, trim(p_title), p_scheduled_at, p_status, p_winner_team_id)
     returning id into v_match_id;
   else
+    select winner_team_id, status into v_previous_winner_id, v_previous_status
+    from public.matches
+    where id = p_match_id;
+    if not found then
+      raise exception 'Match not found';
+    end if;
     update public.matches
     set game_key = p_game_key,
         title = trim(p_title),
         scheduled_at = p_scheduled_at,
         status = p_status,
+        winner_team_id = p_winner_team_id,
         updated_at = now()
     where id = p_match_id
     returning id into v_match_id;
-    if v_match_id is null then
-      raise exception 'Match not found';
-    end if;
+  end if;
+
+  if v_previous_status = 'completed' and v_previous_winner_id is not null
+     and (p_status <> 'completed' or v_previous_winner_id <> p_winner_team_id) then
+    update public.team_scores
+    set score = greatest(score - 1, 0), updated_at = now()
+    where team_id = v_previous_winner_id;
+  end if;
+  if p_status = 'completed' and p_winner_team_id is not null
+     and (v_previous_status <> 'completed' or v_previous_winner_id is distinct from p_winner_team_id) then
+    insert into public.team_scores (team_id, score, updated_at)
+    values (p_winner_team_id, 1, now())
+    on conflict (team_id) do update
+      set score = public.team_scores.score + 1, updated_at = now();
   end if;
 
   return v_match_id;

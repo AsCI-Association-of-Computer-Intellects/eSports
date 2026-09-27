@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { ArrowRight, Menu, Ticket, X } from 'lucide-react'
+import { ArrowRight, CalendarDays, Menu, Ticket, X } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 
 export default function Navbar() {
@@ -32,6 +32,9 @@ export default function Navbar() {
         </Link>
         <Link href="/#rules" onClick={() => setMenuOpen(false)} className="w-full py-2.5 hover:text-ink md:w-auto md:py-0">
           Rules
+        </Link>
+        <Link href="/#schedule" onClick={() => setMenuOpen(false)} className="inline-flex w-full items-center gap-1.5 py-2.5 hover:text-ink md:w-auto md:py-0">
+          <CalendarDays size={14} /> Schedule
         </Link>
         <Link href="/#why" onClick={() => setMenuOpen(false)} className="w-full py-2.5 hover:text-ink md:w-auto md:py-0">
           About AsCI

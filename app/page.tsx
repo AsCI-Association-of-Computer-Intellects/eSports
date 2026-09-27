@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   ArrowRight,
   Award,
@@ -18,11 +18,32 @@ import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import GameLogo from '@/components/GameLogo'
 import { games, gameKeys, type GameKey } from '@/lib/games'
+import { createClient } from '@/lib/supabase/client'
+
+type PublicLeaderboardRow = {
+  team_id: string
+  team_name: string
+  game_key: GameKey
+  team_lead_name: string
+  score: number
+}
+
+type PublicMatch = {
+  id: string
+  game_key: GameKey
+  title: string
+  scheduled_at: string
+  status: 'scheduled' | 'live' | 'completed' | 'cancelled'
+  winner_team_id: string | null
+}
 
 export default function HomePage() {
   const [selectedGame, setSelectedGame] = useState<GameKey>('freefire')
   const game = games[selectedGame]
   const [carouselIndex, setCarouselIndex] = useState(0)
+  const [leaderboardGame, setLeaderboardGame] = useState<GameKey>('freefire')
+  const [leaderboard, setLeaderboard] = useState<PublicLeaderboardRow[]>([])
+  const [schedule, setSchedule] = useState<PublicMatch[]>([])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -30,6 +51,27 @@ export default function HomePage() {
     }, 2800)
     return () => clearInterval(timer)
   }, [])
+
+  const supabase = useMemo(() => {
+    try {
+      return createClient()
+    } catch {
+      return null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!supabase) return
+    const loadCompetitionData = async () => {
+      const [{ data: leaderboardData }, { data: scheduleData }] = await Promise.all([
+        supabase.rpc('get_leaderboard', { p_game_key: leaderboardGame }),
+        supabase.rpc('get_match_schedule'),
+      ])
+      setLeaderboard(Array.isArray(leaderboardData) ? (leaderboardData as PublicLeaderboardRow[]) : [])
+      setSchedule(Array.isArray(scheduleData) ? (scheduleData as PublicMatch[]) : [])
+    }
+    void loadCompetitionData()
+  }, [supabase, leaderboardGame])
 
   return (
     <main className="relative overflow-x-clip">
@@ -227,18 +269,64 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Leaderboard placeholder */}
-      <section id="leaderboard" className="mx-auto max-w-[1320px] px-5 py-12 sm:px-8 md:py-16 lg:px-16">
-        <div className="flex flex-col items-start justify-between gap-5 rounded-panel border border-border bg-surface p-7 sm:flex-row sm:items-center sm:p-9">
-          <div className="flex items-start gap-4">
-            <Trophy size={26} className="mt-1 flex-shrink-0 text-accent-bright" />
+      {/* Schedule */}
+      <section id="schedule" className="border-b border-border bg-bg-elevated/55 px-5 py-12 sm:px-8 md:py-16 lg:px-16">
+        <div className="mx-auto max-w-[1320px]">
+          <div className="mb-7 flex items-end justify-between gap-5">
             <div>
-              <div className="font-display text-[13px] font-semibold tracking-widest text-faint">LIVE LEADERBOARD</div>
-              <h2 className="mt-2 text-[28px] leading-none sm:text-[36px]">Will be available as the <em className="not-italic text-accent-bright">matches start.</em></h2>
+              <div className="font-display text-[13px] font-semibold tracking-widest text-accent-bright">MATCH SCHEDULE</div>
+              <h2 className="mt-2 text-[30px] leading-none sm:text-[42px]">The next <em className="not-italic text-accent-bright">round.</em></h2>
             </div>
+            <Calendar size={26} className="hidden text-accent-bright sm:block" />
           </div>
-          <span className="rounded-full border border-accent/30 bg-accent-soft px-3 py-1.5 font-display text-[11px] font-bold uppercase tracking-widest text-accent-bright">Coming soon</span>
+          {schedule.length === 0 ? (
+            <p className="rounded-panel border border-border bg-surface p-6 text-sm text-muted">Matches will appear here once the schedule is published.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {schedule.map(match => (
+                <article key={match.id} className="rounded-card border border-border bg-surface p-5">
+                  <div className="font-display text-[11px] font-bold uppercase tracking-widest text-accent-bright">{games[match.game_key].name}</div>
+                  <h3 className="mt-2 text-lg">{match.title}</h3>
+                  <p className="mt-2 text-sm text-ink">{new Date(match.scheduled_at).toLocaleString()}</p>
+                  <p className="mt-1 text-xs uppercase tracking-wider text-muted">{match.status}</p>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
+      </section>
+
+      {/* Live leaderboard */}
+      <section id="leaderboard" className="mx-auto max-w-[1320px] px-5 py-12 sm:px-8 md:py-16 lg:px-16">
+        <div className="mb-7 flex items-end justify-between gap-5">
+          <div>
+            <div className="font-display text-[13px] font-semibold tracking-widest text-faint">LIVE LEADERBOARD</div>
+            <h2 className="mt-2 text-[30px] leading-none sm:text-[42px]">Every sport. Its own <em className="not-italic text-accent-bright">race.</em></h2>
+          </div>
+          <Trophy size={26} className="hidden text-accent-bright sm:block" />
+        </div>
+        <div className="mb-5 flex flex-wrap gap-2">
+          {gameKeys.map(key => (
+            <button key={key} type="button" onClick={() => setLeaderboardGame(key)} className={`rounded-full border px-4 py-2.5 text-sm font-semibold ${leaderboardGame === key ? 'border-accent bg-accent-soft text-ink' : 'border-border text-muted hover:text-ink'}`}>
+              {games[key].name}
+            </button>
+          ))}
+        </div>
+        {leaderboard.length === 0 ? (
+          <div className="rounded-panel border border-border bg-surface p-7 text-sm text-muted">Leaderboard will be available as the matches start.</div>
+        ) : (
+          <div className="overflow-hidden rounded-panel border border-border bg-surface">
+            <div className="grid grid-cols-[1fr_auto] gap-4 border-b border-border px-5 py-3 font-display text-[11px] font-bold uppercase tracking-widest text-faint">
+              <span>Team / Team lead</span><span>Score</span>
+            </div>
+            {leaderboard.map((row, index) => (
+              <div key={row.team_id} className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-5 py-4 last:border-b-0">
+                <div className="flex items-center gap-3"><span className="font-display text-xs font-bold text-faint">{String(index + 1).padStart(2, '0')}</span><div><div className="font-semibold text-ink">{row.team_name}</div><div className="text-xs text-muted">Lead: {row.team_lead_name}</div></div></div>
+                <span className="font-display text-lg font-bold text-accent-bright">{row.score}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Team competition */}
