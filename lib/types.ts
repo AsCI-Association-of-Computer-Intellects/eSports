@@ -5,6 +5,7 @@ export type RosterRole = 'leader' | 'member'
 export interface TicketRosterEntry {
   role: RosterRole
   in_game_uid: string
+  display_name: string | null
   email: string | null
   branch: string | null
   section: string | null
@@ -19,6 +20,7 @@ export interface Ticket {
   role: RosterRole
   in_game_uid: string
   email: string | null
+  display_name: string | null
   branch: string | null
   section: string | null
   year_of_study: string | null

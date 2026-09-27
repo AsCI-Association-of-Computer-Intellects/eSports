@@ -117,7 +117,7 @@ export default function TicketsPage() {
                           <li key={`${entry.role}-${entry.in_game_uid}`} className="flex items-center justify-between gap-3 text-sm">
                             <span className="inline-flex min-w-0 items-center gap-2 text-ink">
                               <Users size={14} className="flex-shrink-0 text-faint" />
-                              <span className="truncate">{entry.email || entry.in_game_uid}</span>
+                              <span className="truncate">{entry.display_name ? `${entry.display_name} · ` : ''}{entry.email || entry.in_game_uid}</span>
                             </span>
                             <span className="flex-shrink-0 text-xs uppercase tracking-wider text-faint">{entry.role}</span>
                           </li>
