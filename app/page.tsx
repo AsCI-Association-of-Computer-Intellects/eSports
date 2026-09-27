@@ -24,8 +24,12 @@ type PublicLeaderboardRow = {
   team_id: string
   team_name: string
   game_key: GameKey
+  group_key: 'A' | 'B' | 'C' | 'D' | null
   team_lead_name: string
   score: number
+  kills: number
+  group_rank: number
+  qualified: boolean
 }
 
 type PublicMatch = {
@@ -34,9 +38,7 @@ type PublicMatch = {
   title: string
   scheduled_at: string
   status: 'scheduled' | 'live' | 'completed' | 'cancelled'
-  winner_team_id: string | null
-  team_a_name: string | null
-  team_b_name: string | null
+  group_key: 'A' | 'B' | 'C' | 'D'
 }
 
 export default function HomePage() {
@@ -44,6 +46,7 @@ export default function HomePage() {
   const game = games[selectedGame]
   const [carouselIndex, setCarouselIndex] = useState(0)
   const [leaderboardGame, setLeaderboardGame] = useState<GameKey>('freefire')
+  const [leaderboardGroup, setLeaderboardGroup] = useState<'A' | 'B' | 'C' | 'D'>('A')
   const [leaderboard, setLeaderboard] = useState<PublicLeaderboardRow[]>([])
   const [schedule, setSchedule] = useState<PublicMatch[]>([])
 
@@ -69,11 +72,11 @@ export default function HomePage() {
         supabase.rpc('get_leaderboard', { p_game_key: leaderboardGame }),
         supabase.rpc('get_match_schedule'),
       ])
-      setLeaderboard(Array.isArray(leaderboardData) ? (leaderboardData as PublicLeaderboardRow[]) : [])
+      setLeaderboard(Array.isArray(leaderboardData) ? (leaderboardData as PublicLeaderboardRow[]).filter(row => row.group_key === leaderboardGroup) : [])
       setSchedule(Array.isArray(scheduleData) ? (scheduleData as PublicMatch[]) : [])
     }
     void loadCompetitionData()
-  }, [supabase, leaderboardGame])
+  }, [supabase, leaderboardGame, leaderboardGroup])
 
   return (
     <main className="relative overflow-x-clip">
@@ -288,7 +291,8 @@ export default function HomePage() {
               {schedule.map(match => (
                 <article key={match.id} className="rounded-card border border-border bg-surface p-5">
                   <div className="font-display text-[11px] font-bold uppercase tracking-widest text-accent-bright">{games[match.game_key].name}</div>
-                  <h3 className="mt-2 text-lg">{match.team_a_name || 'Team A'} vs {match.team_b_name || 'Team B'}</h3>
+                  <h3 className="mt-2 text-lg">{match.title}</h3>
+                  <p className="mt-1 text-xs text-muted">Group {match.group_key}</p>
                   <p className="mt-2 text-sm text-ink">{new Date(match.scheduled_at).toLocaleString()}</p>
                   <p className="mt-1 text-xs uppercase tracking-wider text-muted">{match.status}</p>
                 </article>
@@ -309,8 +313,15 @@ export default function HomePage() {
         </div>
         <div className="mb-5 flex flex-wrap gap-2">
           {gameKeys.map(key => (
-            <button key={key} type="button" onClick={() => setLeaderboardGame(key)} className={`rounded-full border px-4 py-2.5 text-sm font-semibold ${leaderboardGame === key ? 'border-accent bg-accent-soft text-ink' : 'border-border text-muted hover:text-ink'}`}>
+            <button key={key} type="button" onClick={() => { setLeaderboardGame(key); setLeaderboardGroup('A') }} className={`rounded-full border px-4 py-2.5 text-sm font-semibold ${leaderboardGame === key ? 'border-accent bg-accent-soft text-ink' : 'border-border text-muted hover:text-ink'}`}>
               {games[key].name}
+            </button>
+          ))}
+        </div>
+        <div className="mb-5 flex flex-wrap gap-2">
+          {(['A', 'B', 'C', 'D'] as const).map(group => (
+            <button key={group} type="button" onClick={() => setLeaderboardGroup(group)} className={`rounded-full border px-3.5 py-2 text-xs font-semibold ${leaderboardGroup === group ? 'border-accent bg-accent-soft text-ink' : 'border-border text-muted hover:text-ink'}`}>
+              Group {group}
             </button>
           ))}
         </div>
@@ -319,12 +330,12 @@ export default function HomePage() {
         ) : (
           <div className="overflow-hidden rounded-panel border border-border bg-surface">
             <div className="grid grid-cols-[1fr_auto] gap-4 border-b border-border px-5 py-3 font-display text-[11px] font-bold uppercase tracking-widest text-faint">
-              <span>Team / Team lead</span><span>Score</span>
+              <span>Team / Team lead</span><span>Points</span>
             </div>
             {leaderboard.map((row, index) => (
               <div key={row.team_id} className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-5 py-4 last:border-b-0">
-                <div className="flex items-center gap-3"><span className="font-display text-xs font-bold text-faint">{String(index + 1).padStart(2, '0')}</span><div><div className="font-semibold text-ink">{row.team_name}</div><div className="text-xs text-muted">Lead: {row.team_lead_name}</div></div></div>
-                <span className="font-display text-lg font-bold text-accent-bright">{row.score}</span>
+                <div className="flex items-center gap-3"><span className="font-display text-xs font-bold text-faint">{String(index + 1).padStart(2, '0')}</span><div><div className="font-semibold text-ink">{row.team_name}</div><div className="text-xs text-muted">Lead: {row.team_lead_name} · {row.kills} kills</div></div></div>
+                <div className="text-right"><span className="font-display text-lg font-bold text-accent-bright">{row.score}</span>{row.qualified && <div className="text-[10px] font-bold uppercase tracking-wider text-accent-bright">Qualified</div>}</div>
               </div>
             ))}
           </div>
