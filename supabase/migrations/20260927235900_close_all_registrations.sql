@@ -5,8 +5,8 @@ security definer
 set search_path = public
 as $$
 begin
-    if not public.is_admin()
-      and now() >= timestamptz '2026-09-27 23:59:00+05:30' then
+  if not public.is_admin()
+     and now() >= timestamptz '2026-09-27 23:59:00+05:30' then
     raise exception 'All The Slots are filled';
   end if;
   return new;
