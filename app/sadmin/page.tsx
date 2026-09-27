@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Calendar, LogOut, Save, Shield, Trophy } from 'lucide-react'
+import { Calendar, LogOut, Shield, Trophy } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { games, gameKeys, type GameKey } from '@/lib/games'
 
 type RosterMember = {
+  registration_id: string
   role: string
   display_name: string | null
   email: string | null
@@ -23,6 +24,7 @@ type AdminTeam = {
   team_id: string
   team_name: string
   game_key: GameKey
+  group_key: 'A' | 'B' | 'C' | 'D' | null
   eliminated_by_match_id: string | null
   score: number
   roster: RosterMember[]
@@ -31,34 +33,29 @@ type AdminTeam = {
 type AdminMatch = {
   id: string
   game_key: GameKey
-  title: string | null
+  title: string
   scheduled_at: string
   status: 'scheduled' | 'live' | 'completed' | 'cancelled'
-  winner_team_id: string | null
-  team_a_id: string | null
-  team_b_id: string | null
-  team_a_name: string | null
-  team_b_name: string | null
+  group_key: 'A' | 'B' | 'C' | 'D'
+  scores: MatchScore[]
 }
+
+type MatchScore = { team_id: string; team_name: string; kills: number; finish_position: number; points: number }
 
 type MatchForm = {
   id: string | null
   gameKey: GameKey
-  teamAId: string
-  teamBId: string
+  groupKey: 'A' | 'B' | 'C' | 'D'
   scheduledAt: string
   status: AdminMatch['status']
-  winnerTeamId: string
 }
 
 const emptyMatch: MatchForm = {
   id: null,
   gameKey: 'freefire',
-  teamAId: '',
-  teamBId: '',
+  groupKey: 'A',
   scheduledAt: '',
   status: 'scheduled',
-  winnerTeamId: '',
 }
 
 function localDateTime(isoDate: string) {
@@ -74,15 +71,14 @@ export default function SAdminPage() {
   const [matches, setMatches] = useState<AdminMatch[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [scoreEdits, setScoreEdits] = useState<Record<string, string>>({})
-  const [teamEdits, setTeamEdits] = useState<Record<string, { teamName: string; leaderEmail: string; leaderName: string }>>({})
-  const [savingTeam, setSavingTeam] = useState<string | null>(null)
+  const [teamEdits, setTeamEdits] = useState<Record<string, { teamName: string; leaderEmail: string; leaderName: string; groupKey: 'A' | 'B' | 'C' | 'D' }>>({})
+  const [memberEdits, setMemberEdits] = useState<Record<string, { name: string; email: string }>>({})
   const [savingDetails, setSavingDetails] = useState<string | null>(null)
   const [savingMatch, setSavingMatch] = useState(false)
   const [matchForm, setMatchForm] = useState<MatchForm>(emptyMatch)
   const [teamGameFilter, setTeamGameFilter] = useState<GameKey | 'all'>('all')
-  const [teamASearch, setTeamASearch] = useState('')
-  const [teamBSearch, setTeamBSearch] = useState('')
+  const [groupSearch, setGroupSearch] = useState('')
+  const [matchScoreEdits, setMatchScoreEdits] = useState<Record<string, { kills: string; position: string }>>({})
 
   const supabase = useMemo(() => {
     try {
@@ -111,11 +107,11 @@ export default function SAdminPage() {
     const nextTeams = Array.isArray(dashboard.teams) ? dashboard.teams : []
     setTeams(nextTeams)
     setMatches(Array.isArray(dashboard.matches) ? dashboard.matches : [])
-    setScoreEdits(Object.fromEntries(nextTeams.map(team => [team.team_id, String(team.score)])))
     setTeamEdits(Object.fromEntries(nextTeams.map(team => {
       const leader = team.roster.find(member => member.role === 'leader')
-      return [team.team_id, { teamName: team.team_name, leaderEmail: leader?.email || '', leaderName: leader?.display_name || 'Team leader' }]
+      return [team.team_id, { teamName: team.team_name, leaderEmail: leader?.email || '', leaderName: leader?.display_name || 'Team leader', groupKey: team.group_key || 'A' }]
     })))
+    setMemberEdits(Object.fromEntries(nextTeams.flatMap(team => team.roster.map(member => [member.registration_id, { name: member.display_name || '', email: member.email || '' }]))))
     setError(null)
     setLoading(false)
   }
@@ -129,27 +125,6 @@ export default function SAdminPage() {
     void loadDashboard()
   }, [authLoading, user, router, supabase])
 
-  const updateScore = async (teamId: string) => {
-    if (!supabase) return
-    const score = Number(scoreEdits[teamId])
-    if (!Number.isFinite(score) || score < 0) {
-      setError('Scores must be zero or higher.')
-      return
-    }
-
-    setSavingTeam(teamId)
-    const { error: scoreError } = await supabase.rpc('update_team_score', {
-      p_team_id: teamId,
-      p_score: score,
-    })
-    setSavingTeam(null)
-    if (scoreError) {
-      setError(scoreError.message.replace(/^.*ERROR:\s*/i, ''))
-      return
-    }
-    setTeams(current => current.map(team => (team.team_id === teamId ? { ...team, score } : team)))
-    setError(null)
-  }
 
   const updateTeamDetails = async (teamId: string) => {
     if (!supabase) return
@@ -161,6 +136,7 @@ export default function SAdminPage() {
       p_team_name: details.teamName,
       p_leader_email: details.leaderEmail,
       p_leader_name: details.leaderName,
+      p_group_key: details.groupKey,
     })
     setSavingDetails(null)
     if (detailsError) {
@@ -175,6 +151,22 @@ export default function SAdminPage() {
     setError(null)
   }
 
+  const updateMemberDetails = async (registrationId: string) => {
+    if (!supabase) return
+    const details = memberEdits[registrationId]
+    if (!details) return
+    const { error: memberError } = await supabase.rpc('update_registration_details', {
+      p_registration_id: registrationId,
+      p_display_name: details.name,
+      p_email: details.email,
+    })
+    if (memberError) setError(memberError.message.replace(/^.*ERROR:\s*/i, ''))
+    else {
+      setError(null)
+      await loadDashboard()
+    }
+  }
+
   const saveMatch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!supabase || !matchForm.scheduledAt) {
@@ -186,11 +178,9 @@ export default function SAdminPage() {
     const { error: matchError } = await supabase.rpc('save_match', {
       p_match_id: matchForm.id,
       p_game_key: matchForm.gameKey,
-      p_team_a_id: matchForm.teamAId,
-      p_team_b_id: matchForm.teamBId,
+      p_group_key: matchForm.groupKey,
       p_scheduled_at: new Date(matchForm.scheduledAt).toISOString(),
       p_status: matchForm.status,
-      p_winner_team_id: matchForm.winnerTeamId || null,
     })
     setSavingMatch(false)
     if (matchError) {
@@ -204,12 +194,21 @@ export default function SAdminPage() {
   }
 
   const visibleTeams = teamGameFilter === 'all' ? teams : teams.filter(team => team.game_key === teamGameFilter)
-  const sportTeams = teams.filter(team => team.game_key === matchForm.gameKey && (!team.eliminated_by_match_id || team.eliminated_by_match_id === matchForm.id))
-  const filteredTeamA = sportTeams.filter(team => team.team_name.toLowerCase().includes(teamASearch.trim().toLowerCase()) || team.team_id === matchForm.teamAId)
-  const filteredTeamB = sportTeams.filter(team => team.team_name.toLowerCase().includes(teamBSearch.trim().toLowerCase()) || team.team_id === matchForm.teamBId)
-  const selectedTeamA = teams.find(team => team.team_id === matchForm.teamAId)
-  const selectedTeamB = teams.find(team => team.team_id === matchForm.teamBId)
-  const autoTitle = selectedTeamA && selectedTeamB ? `${selectedTeamA.team_name} vs ${selectedTeamB.team_name}` : 'Select Team A and Team B'
+  const groupTeams = teams.filter(team => team.game_key === matchForm.gameKey && team.group_key === matchForm.groupKey && !team.eliminated_by_match_id && team.team_name.toLowerCase().includes(groupSearch.trim().toLowerCase()))
+
+  const saveMatchScore = async (matchId: string, teamId: string) => {
+    if (!supabase) return
+    const edit = matchScoreEdits[`${matchId}:${teamId}`]
+    if (!edit) return
+    const { error: scoreError } = await supabase.rpc('save_match_score', {
+      p_match_id: matchId,
+      p_team_id: teamId,
+      p_kills: Number(edit.kills),
+      p_finish_position: Number(edit.position),
+    })
+    if (scoreError) setError(scoreError.message.replace(/^.*ERROR:\s*/i, ''))
+    else await loadDashboard()
+  }
 
   if (authLoading || loading) {
     return (
@@ -285,7 +284,7 @@ export default function SAdminPage() {
                       </div>
                     </summary>
                     <div className="mt-4 border-t border-border pt-4">
-                      <div className="mb-5 grid grid-cols-1 gap-3 rounded-control border border-border bg-bg-elevated/50 p-4 sm:grid-cols-3">
+                      <div className="mb-5 grid grid-cols-1 gap-3 rounded-control border border-border bg-bg-elevated/50 p-4 sm:grid-cols-4">
                         <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
                           Team name
                           <input value={teamEdits[team.team_id]?.teamName || ''} onChange={event => setTeamEdits(current => ({ ...current, [team.team_id]: { ...current[team.team_id], teamName: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none" />
@@ -298,36 +297,25 @@ export default function SAdminPage() {
                           Leader email
                           <input type="email" value={teamEdits[team.team_id]?.leaderEmail || ''} onChange={event => setTeamEdits(current => ({ ...current, [team.team_id]: { ...current[team.team_id], leaderEmail: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none" />
                         </label>
+                        <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
+                          Group
+                          <select value={teamEdits[team.team_id]?.groupKey || 'A'} onChange={event => setTeamEdits(current => ({ ...current, [team.team_id]: { ...current[team.team_id], groupKey: event.target.value as 'A' | 'B' | 'C' | 'D' } }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none">
+                            {['A', 'B', 'C', 'D'].map(group => <option key={group} value={group}>Group {group}</option>)}
+                          </select>
+                        </label>
                         <button type="button" onClick={() => void updateTeamDetails(team.team_id)} disabled={savingDetails === team.team_id} className="inline-flex items-center justify-center rounded-control border border-accent/40 bg-accent-soft px-4 py-2.5 text-sm font-semibold text-accent-bright disabled:opacity-60 sm:col-span-3">
                           {savingDetails === team.team_id ? 'Saving team details…' : 'Save team details'}
-                        </button>
-                      </div>
-                      <div className="mb-4 flex flex-wrap items-end gap-3">
-                        <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
-                          Score
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={scoreEdits[team.team_id] ?? team.score}
-                            onChange={event => setScoreEdits(current => ({ ...current, [team.team_id]: event.target.value }))}
-                            className="w-32 rounded-control border border-border bg-bg-elevated px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => void updateScore(team.team_id)}
-                          disabled={savingTeam === team.team_id}
-                          className="inline-flex items-center gap-2 rounded-control bg-accent-gradient px-4 py-2.5 text-sm font-semibold text-[#04101f] disabled:opacity-60"
-                        >
-                          <Save size={15} /> {savingTeam === team.team_id ? 'Saving…' : 'Save score'}
                         </button>
                       </div>
                       <ul className="space-y-2 text-sm">
                         {team.roster.map(member => (
                           <li key={`${team.team_id}-${member.in_game_uid}`} className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-2 first:border-t-0">
-                            <span className="text-ink">{member.display_name || member.email || 'No name'} <span className="text-muted">· {member.email || 'No email'} · {member.role}</span></span>
-                            <span className="text-xs text-muted">UID {member.in_game_uid}</span>
+                            <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                              <input value={memberEdits[member.registration_id]?.name || ''} onChange={event => setMemberEdits(current => ({ ...current, [member.registration_id]: { ...current[member.registration_id], name: event.target.value } }))} placeholder="Member name" className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-sm text-ink" />
+                              <input type="email" value={memberEdits[member.registration_id]?.email || ''} onChange={event => setMemberEdits(current => ({ ...current, [member.registration_id]: { ...current[member.registration_id], email: event.target.value } }))} placeholder="Member email" className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-sm text-ink" />
+                              <button type="button" onClick={() => void updateMemberDetails(member.registration_id)} className="rounded-control border border-accent/40 px-3 py-2 text-xs font-semibold text-accent-bright">Save</button>
+                            </div>
+                            <span className="text-xs text-muted">UID {member.in_game_uid} · {member.role}</span>
                           </li>
                         ))}
                       </ul>
@@ -340,88 +328,27 @@ export default function SAdminPage() {
 
             <section className="space-y-8">
               <div>
-                <div className="mb-5 flex items-end gap-3">
-                  <Calendar size={20} className="text-accent-bright" />
-                  <div>
-                    <div className="hud-label text-faint">MATCH OPERATIONS</div>
-                    <h2 className="mt-2 text-2xl">Schedule a match</h2>
-                  </div>
-                </div>
+                <div className="mb-5 flex items-end gap-3"><Calendar size={20} className="text-accent-bright" /><div><div className="hud-label text-faint">MATCH OPERATIONS</div><h2 className="mt-2 text-2xl">Schedule a group match</h2></div></div>
                 <form onSubmit={saveMatch} className="rounded-panel border border-border bg-surface p-5 sm:p-6">
                   <div className="flex flex-col gap-4">
-                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
-                      Game
-                      <select value={matchForm.gameKey} onChange={event => { setTeamASearch(''); setTeamBSearch(''); setMatchForm(current => ({ ...current, gameKey: event.target.value as GameKey, teamAId: '', teamBId: '', winnerTeamId: '' })) }} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink focus:border-accent focus:outline-none">
-                        {gameKeys.map(key => <option key={key} value={key}>{games[key].name}</option>)}
-                      </select>
-                    </label>
-                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
-                      Match title (automatic)
-                      <input readOnly value={autoTitle} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink opacity-80" />
-                    </label>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
-                        Team A
-                        <input value={teamASearch} onChange={event => setTeamASearch(event.target.value)} placeholder={`Search ${games[matchForm.gameKey].name} teams`} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none" />
-                        <select required value={matchForm.teamAId} onChange={event => setMatchForm(current => ({ ...current, teamAId: event.target.value, winnerTeamId: current.winnerTeamId === current.teamAId ? '' : current.winnerTeamId }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink focus:border-accent focus:outline-none">
-                          <option value="">Select Team A</option>
-                          {filteredTeamA.map(team => <option key={team.team_id} value={team.team_id}>{team.team_name}</option>)}
-                        </select>
-                      </label>
-                      <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
-                        Team B
-                        <input value={teamBSearch} onChange={event => setTeamBSearch(event.target.value)} placeholder={`Search ${games[matchForm.gameKey].name} teams`} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none" />
-                        <select required value={matchForm.teamBId} onChange={event => setMatchForm(current => ({ ...current, teamBId: event.target.value, winnerTeamId: current.winnerTeamId === current.teamBId ? '' : current.winnerTeamId }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink focus:border-accent focus:outline-none">
-                          <option value="">Select Team B</option>
-                          {filteredTeamB.map(team => <option key={team.team_id} value={team.team_id}>{team.team_name}</option>)}
-                        </select>
-                      </label>
-                    </div>
-                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
-                      Date and time
-                      <input required type="datetime-local" value={matchForm.scheduledAt} onChange={event => setMatchForm(current => ({ ...current, scheduledAt: event.target.value }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink focus:border-accent focus:outline-none" />
-                    </label>
-                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
-                      Status
-                      <select value={matchForm.status} onChange={event => setMatchForm(current => ({ ...current, status: event.target.value as AdminMatch['status'] }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink focus:border-accent focus:outline-none">
-                        <option value="scheduled">Scheduled</option>
-                        <option value="live">Live</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    </label>
-                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
-                      Winner {matchForm.status === 'completed' ? '(required)' : '(optional)'}
-                      <select required={matchForm.status === 'completed'} value={matchForm.winnerTeamId} onChange={event => setMatchForm(current => ({ ...current, winnerTeamId: event.target.value }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink focus:border-accent focus:outline-none">
-                        <option value="">Select winner</option>
-                        {selectedTeamA && <option value={selectedTeamA.team_id}>{selectedTeamA.team_name}</option>}
-                        {selectedTeamB && <option value={selectedTeamB.team_id}>{selectedTeamB.team_name}</option>}
-                      </select>
-                    </label>
-                    <button type="submit" disabled={savingMatch} className="inline-flex items-center justify-center gap-2 rounded-control bg-accent-gradient px-4 py-3 text-sm font-semibold text-[#04101f] disabled:opacity-60">
-                      <Calendar size={15} /> {savingMatch ? 'Saving…' : matchForm.id ? 'Update match' : 'Schedule match'}
-                    </button>
-                    {matchForm.id && <button type="button" onClick={() => { setTeamASearch(''); setTeamBSearch(''); setMatchForm(emptyMatch) }} className="text-xs text-muted hover:text-ink">Cancel editing</button>}
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">Game<select value={matchForm.gameKey} onChange={event => setMatchForm(current => ({ ...current, gameKey: event.target.value as GameKey }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink"><option value="freefire">Free Fire</option><option value="bgmi">BGMI</option><option value="codm">Call of Duty: Mobile</option></select></label>
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">Group<select value={matchForm.groupKey} onChange={event => setMatchForm(current => ({ ...current, groupKey: event.target.value as MatchForm['groupKey'] }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink">{['A', 'B', 'C', 'D'].map(group => <option key={group} value={group}>Group {group}</option>)}</select></label>
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">Search teams in this group<input value={groupSearch} onChange={event => setGroupSearch(event.target.value)} placeholder="Search team name" className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink placeholder:text-faint" /></label>
+                    <p className="text-xs text-muted">{groupTeams.length} active teams in {games[matchForm.gameKey].name} Group {matchForm.groupKey}</p>
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">Date and time<input required type="datetime-local" value={matchForm.scheduledAt} onChange={event => setMatchForm(current => ({ ...current, scheduledAt: event.target.value }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink" /></label>
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">Status<select value={matchForm.status} onChange={event => setMatchForm(current => ({ ...current, status: event.target.value as AdminMatch['status'] }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink"><option value="scheduled">Scheduled</option><option value="live">Live</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label>
+                    <button type="submit" disabled={savingMatch} className="inline-flex items-center justify-center gap-2 rounded-control bg-accent-gradient px-4 py-3 text-sm font-semibold text-[#04101f] disabled:opacity-60"><Calendar size={15} /> {savingMatch ? 'Saving…' : matchForm.id ? 'Update match' : 'Schedule match'}</button>
+                    {matchForm.id && <button type="button" onClick={() => { setGroupSearch(''); setMatchForm(emptyMatch) }} className="text-xs text-muted">Cancel editing</button>}
                   </div>
                 </form>
               </div>
-
               <div>
-                <div className="mb-4 flex items-center gap-2"><Trophy size={18} className="text-accent-bright" /><h2 className="text-xl">Scheduled matches</h2></div>
+                <div className="mb-4 flex items-center gap-2"><Trophy size={18} className="text-accent-bright" /><h2 className="text-xl">Matches and scoring</h2></div>
                 <div className="space-y-3">
-                  {matches.map(match => (
-                    <div key={match.id} className="rounded-control border border-border bg-surface p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-display text-[10px] font-bold uppercase tracking-widest text-accent-bright">{games[match.game_key].name}</div>
-                          <h3 className="mt-1 text-base">{match.team_a_name || 'Team A'} vs {match.team_b_name || 'Team B'}</h3>
-                          <p className="mt-1 text-xs text-muted">{new Date(match.scheduled_at).toLocaleString()} · {match.status}</p>
-                          {match.winner_team_id && <p className="mt-1 text-xs text-accent-bright">Winner selected</p>}
-                        </div>
-                        <button type="button" onClick={() => { setTeamASearch(''); setTeamBSearch(''); setMatchForm({ id: match.id, gameKey: match.game_key, teamAId: match.team_a_id || '', teamBId: match.team_b_id || '', scheduledAt: localDateTime(match.scheduled_at), status: match.status, winnerTeamId: match.winner_team_id || '' }) }} className="text-xs font-semibold text-accent-bright hover:text-ink">Edit</button>
-                      </div>
-                    </div>
-                  ))}
+                  {matches.map(match => <div key={match.id} className="rounded-control border border-border bg-surface p-4">
+                    <div className="flex items-start justify-between gap-3"><div><div className="font-display text-[10px] font-bold uppercase tracking-widest text-accent-bright">{games[match.game_key].name} · GROUP {match.group_key}</div><h3 className="mt-1 text-base">{match.title}</h3><p className="mt-1 text-xs text-muted">{new Date(match.scheduled_at).toLocaleString()} · {match.status}</p></div><button type="button" onClick={() => setMatchForm({ id: match.id, gameKey: match.game_key, groupKey: match.group_key, scheduledAt: localDateTime(match.scheduled_at), status: match.status })} className="text-xs font-semibold text-accent-bright">Edit</button></div>
+                    {match.status === 'completed' && <div className="mt-4 space-y-2 border-t border-border pt-3">{match.scores.map(score => { const key = `${match.id}:${score.team_id}`; const edit = matchScoreEdits[key] || { kills: String(score.kills), position: String(score.finish_position) }; return <div key={score.team_id} className="grid grid-cols-[1fr_70px_70px_auto] items-end gap-2 text-xs"><span className="pb-2 text-ink">{score.team_name}</span><input type="number" min="0" value={edit.kills} onChange={event => setMatchScoreEdits(current => ({ ...current, [key]: { ...edit, kills: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-ink" placeholder="Kills" /><input type="number" min="1" value={edit.position} onChange={event => setMatchScoreEdits(current => ({ ...current, [key]: { ...edit, position: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-ink" placeholder="Place" /><button type="button" onClick={() => void saveMatchScore(match.id, score.team_id)} className="rounded-control border border-accent/40 px-2 py-2 text-accent-bright">Save</button></div> })}</div>}
+                  </div>)}
                   {matches.length === 0 && <p className="text-sm text-muted">No matches scheduled yet.</p>}
                 </div>
               </div>
