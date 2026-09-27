@@ -35,6 +35,8 @@ type PublicMatch = {
   scheduled_at: string
   status: 'scheduled' | 'live' | 'completed' | 'cancelled'
   winner_team_id: string | null
+  team_a_name: string | null
+  team_b_name: string | null
 }
 
 export default function HomePage() {
@@ -286,7 +288,7 @@ export default function HomePage() {
               {schedule.map(match => (
                 <article key={match.id} className="rounded-card border border-border bg-surface p-5">
                   <div className="font-display text-[11px] font-bold uppercase tracking-widest text-accent-bright">{games[match.game_key].name}</div>
-                  <h3 className="mt-2 text-lg">{match.title}</h3>
+                  <h3 className="mt-2 text-lg">{match.team_a_name || 'Team A'} vs {match.team_b_name || 'Team B'}</h3>
                   <p className="mt-2 text-sm text-ink">{new Date(match.scheduled_at).toLocaleString()}</p>
                   <p className="mt-1 text-xs uppercase tracking-wider text-muted">{match.status}</p>
                 </article>
