@@ -51,6 +51,8 @@ type NewTeamForm = {
   leaderUid: string
 }
 
+type NewMemberForm = { teamId: string; name: string; email: string; uid: string }
+
 type MatchForm = {
   id: string | null
   gameKey: GameKey
@@ -90,6 +92,7 @@ export default function SAdminPage() {
   const [savingMatch, setSavingMatch] = useState(false)
   const [matchForm, setMatchForm] = useState<MatchForm>(emptyMatch)
   const [newTeam, setNewTeam] = useState<NewTeamForm>(emptyTeam)
+  const [newMember, setNewMember] = useState<NewMemberForm>({ teamId: '', name: '', email: '', uid: '' })
   const [savingNewTeam, setSavingNewTeam] = useState(false)
   const [teamGameFilter, setTeamGameFilter] = useState<GameKey | 'all'>('all')
   const [groupSearch, setGroupSearch] = useState('')
@@ -231,6 +234,24 @@ export default function SAdminPage() {
     await loadDashboard()
   }
 
+  const addMember = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!supabase || !newMember.teamId) return
+    const { error: memberError } = await supabase.rpc('admin_add_team_member', {
+      p_team_id: newMember.teamId,
+      p_display_name: newMember.name,
+      p_email: newMember.email,
+      p_in_game_uid: newMember.uid,
+    })
+    if (memberError) {
+      setError(memberError.message.replace(/^.*ERROR:\s*/i, ''))
+      return
+    }
+    setNewMember({ teamId: '', name: '', email: '', uid: '' })
+    setError(null)
+    await loadDashboard()
+  }
+
   const visibleTeams = teamGameFilter === 'all' ? teams : teams.filter(team => team.game_key === teamGameFilter)
   const groupTeams = teams.filter(team => team.game_key === matchForm.gameKey && team.group_key === matchForm.groupKey && !team.eliminated_by_match_id && team.team_name.toLowerCase().includes(groupSearch.trim().toLowerCase()))
 
@@ -358,6 +379,12 @@ export default function SAdminPage() {
                           </li>
                         ))}
                       </ul>
+                      <form onSubmit={addMember} className="mt-4 grid grid-cols-1 gap-2 border-t border-border pt-4 sm:grid-cols-[1fr_1fr_1fr_auto]">
+                        <input required value={newMember.teamId === team.team_id ? newMember.name : ''} onChange={event => setNewMember(current => ({ ...current, teamId: team.team_id, name: event.target.value }))} placeholder="New member name" className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-sm text-ink" />
+                        <input required type="email" value={newMember.teamId === team.team_id ? newMember.email : ''} onChange={event => setNewMember(current => ({ ...current, teamId: team.team_id, email: event.target.value }))} placeholder="Member email" className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-sm text-ink" />
+                        <input required value={newMember.teamId === team.team_id ? newMember.uid : ''} onChange={event => setNewMember(current => ({ ...current, teamId: team.team_id, uid: event.target.value }))} placeholder="In-game UID" className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-sm text-ink" />
+                        <button type="submit" className="rounded-control border border-accent/40 px-3 py-2 text-xs font-semibold text-accent-bright">Add member</button>
+                      </form>
                     </div>
                   </details>
                 ))}

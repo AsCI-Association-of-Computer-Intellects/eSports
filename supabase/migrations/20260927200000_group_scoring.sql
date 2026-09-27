@@ -55,7 +55,7 @@ as $$
       t.id as team_id,
       t.team_name,
       t.game_key,
-      t.group_key,
+      coalesce(t.group_key, 'A') as group_key,
       coalesce(sum(ms.points), 0)::integer as score,
       coalesce(sum(ms.kills), 0)::integer as kills
     from public.teams t
@@ -163,7 +163,7 @@ begin
   if p_kills < 0 or p_finish_position < 1 then raise exception 'Kills and position are invalid'; end if;
   select m.group_key, m.game_key into v_group, v_game from public.matches m where m.id = p_match_id;
   if not found then raise exception 'Match not found'; end if;
-  if not exists (select 1 from public.teams where id = p_team_id and game_key = v_game and group_key = v_group) then
+  if not exists (select 1 from public.teams where id = p_team_id and game_key = v_game and coalesce(group_key, 'A') = v_group) then
     raise exception 'Team does not belong to this match group';
   end if;
   v_points := p_kills + public.placement_points(p_finish_position);
@@ -184,7 +184,7 @@ begin
   return jsonb_build_object(
     'teams', coalesce((select jsonb_agg(jsonb_build_object(
       'team_id', t.id, 'team_name', t.team_name, 'game_key', t.game_key,
-      'group_key', t.group_key, 'eliminated_by_match_id', t.eliminated_by_match_id,
+      'group_key', coalesce(t.group_key, 'A'), 'eliminated_by_match_id', t.eliminated_by_match_id,
       'score', coalesce((select sum(ms.points) from public.match_scores ms where ms.team_id = t.id), 0),
       'roster', coalesce((select jsonb_agg(jsonb_build_object(
         'registration_id', r.id, 'role', r.role, 'display_name', coalesce(rp.display_name, r.display_name, r.email), 'email', r.email, 'in_game_uid', r.in_game_uid,
@@ -199,7 +199,7 @@ begin
         'finish_position', coalesce(ms.finish_position, 1), 'points', coalesce(ms.points, 0)
       ) order by coalesce(ms.finish_position, 999), t.team_name)
       from public.teams t left join public.match_scores ms on ms.team_id = t.id and ms.match_id = m.id
-      where t.game_key = m.game_key and t.group_key = m.group_key and t.eliminated_by_match_id is null), '[]'::jsonb)
+      where t.game_key = m.game_key and coalesce(t.group_key, 'A') = m.group_key and t.eliminated_by_match_id is null), '[]'::jsonb)
     ) order by m.scheduled_at) from public.matches m), '[]'::jsonb)
   );
 end;
