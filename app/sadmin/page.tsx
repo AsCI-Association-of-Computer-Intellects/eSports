@@ -72,7 +72,7 @@ export default function SAdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [teamEdits, setTeamEdits] = useState<Record<string, { teamName: string; leaderEmail: string; leaderName: string; groupKey: 'A' | 'B' | 'C' | 'D' }>>({})
-  const [memberEdits, setMemberEdits] = useState<Record<string, { name: string; email: string }>>({})
+  const [memberEdits, setMemberEdits] = useState<Record<string, { name: string; email: string; uid: string }>>({})
   const [savingDetails, setSavingDetails] = useState<string | null>(null)
   const [savingMatch, setSavingMatch] = useState(false)
   const [matchForm, setMatchForm] = useState<MatchForm>(emptyMatch)
@@ -109,9 +109,9 @@ export default function SAdminPage() {
     setMatches(Array.isArray(dashboard.matches) ? dashboard.matches : [])
     setTeamEdits(Object.fromEntries(nextTeams.map(team => {
       const leader = team.roster.find(member => member.role === 'leader')
-      return [team.team_id, { teamName: team.team_name, leaderEmail: leader?.email || '', leaderName: leader?.display_name || 'Team leader', groupKey: team.group_key || 'A' }]
+      return [team.team_id, { teamName: team.team_name, leaderEmail: leader?.email || '', leaderName: leader?.display_name || leader?.email || '', groupKey: team.group_key || 'A' }]
     })))
-    setMemberEdits(Object.fromEntries(nextTeams.flatMap(team => team.roster.map(member => [member.registration_id, { name: member.display_name || '', email: member.email || '' }]))))
+    setMemberEdits(Object.fromEntries(nextTeams.flatMap(team => team.roster.map(member => [member.registration_id, { name: member.display_name || member.email || '', email: member.email || '', uid: member.in_game_uid }]))))
     setError(null)
     setLoading(false)
   }
@@ -159,6 +159,7 @@ export default function SAdminPage() {
       p_registration_id: registrationId,
       p_display_name: details.name,
       p_email: details.email,
+      p_in_game_uid: details.uid,
     })
     if (memberError) setError(memberError.message.replace(/^.*ERROR:\s*/i, ''))
     else {
@@ -310,9 +311,10 @@ export default function SAdminPage() {
                       <ul className="space-y-2 text-sm">
                         {team.roster.map(member => (
                           <li key={`${team.team_id}-${member.in_game_uid}`} className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-2 first:border-t-0">
-                            <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                            <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
                               <input value={memberEdits[member.registration_id]?.name || ''} onChange={event => setMemberEdits(current => ({ ...current, [member.registration_id]: { ...current[member.registration_id], name: event.target.value } }))} placeholder="Member name" className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-sm text-ink" />
                               <input type="email" value={memberEdits[member.registration_id]?.email || ''} onChange={event => setMemberEdits(current => ({ ...current, [member.registration_id]: { ...current[member.registration_id], email: event.target.value } }))} placeholder="Member email" className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-sm text-ink" />
+                              <input value={memberEdits[member.registration_id]?.uid || ''} onChange={event => setMemberEdits(current => ({ ...current, [member.registration_id]: { ...current[member.registration_id], uid: event.target.value } }))} placeholder="In-game UID" className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-sm text-ink" />
                               <button type="button" onClick={() => void updateMemberDetails(member.registration_id)} className="rounded-control border border-accent/40 px-3 py-2 text-xs font-semibold text-accent-bright">Save</button>
                             </div>
                             <span className="text-xs text-muted">UID {member.in_game_uid} · {member.role}</span>

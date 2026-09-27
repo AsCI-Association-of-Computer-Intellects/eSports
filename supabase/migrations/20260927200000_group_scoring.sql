@@ -205,10 +205,13 @@ begin
 end;
 $$;
 
+drop function if exists public.update_registration_details(uuid, text, text);
+
 create or replace function public.update_registration_details(
   p_registration_id uuid,
   p_display_name text,
-  p_email text
+  p_email text,
+  p_in_game_uid text
 )
 returns void
 language plpgsql
@@ -217,11 +220,11 @@ set search_path = public
 as $$
 begin
   if not public.is_admin() then raise exception 'Admin access required'; end if;
-  if trim(coalesce(p_display_name, '')) = '' or trim(coalesce(p_email, '')) = '' then
-    raise exception 'Member name and email are required';
+  if trim(coalesce(p_display_name, '')) = '' or trim(coalesce(p_email, '')) = '' or trim(coalesce(p_in_game_uid, '')) = '' then
+    raise exception 'Member name, email, and UID are required';
   end if;
   update public.registrations
-  set display_name = trim(p_display_name), email = lower(trim(p_email))
+  set display_name = trim(p_display_name), email = lower(trim(p_email)), in_game_uid = trim(p_in_game_uid)
   where id = p_registration_id;
   if not found then raise exception 'Registration not found'; end if;
 end;
@@ -234,4 +237,4 @@ grant execute on function public.save_match(uuid, text, text, timestamptz, text)
 grant execute on function public.save_match_score(uuid, uuid, integer, integer) to authenticated;
 grant execute on function public.get_admin_dashboard() to authenticated;
 grant execute on function public.update_team_details(uuid, text, text, text, text) to authenticated;
-grant execute on function public.update_registration_details(uuid, text, text) to authenticated;
+grant execute on function public.update_registration_details(uuid, text, text, text) to authenticated;
