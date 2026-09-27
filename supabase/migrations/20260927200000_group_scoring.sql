@@ -72,7 +72,7 @@ as $$
       'team_name', r.team_name,
       'game_key', r.game_key,
       'group_key', r.group_key,
-      'team_lead_name', coalesce(lead.display_name, leader_profile.display_name, lead.email, 'Team leader'),
+      'team_lead_name', coalesce(leader_profile.display_name, lead.display_name, lead.email, 'Team leader'),
       'score', r.score,
       'kills', r.kills,
       'group_rank', r.group_rank,
@@ -187,9 +187,9 @@ begin
       'group_key', t.group_key, 'eliminated_by_match_id', t.eliminated_by_match_id,
       'score', coalesce((select sum(ms.points) from public.match_scores ms where ms.team_id = t.id), 0),
       'roster', coalesce((select jsonb_agg(jsonb_build_object(
-        'registration_id', r.id, 'role', r.role, 'display_name', r.display_name, 'email', r.email, 'in_game_uid', r.in_game_uid,
+        'registration_id', r.id, 'role', r.role, 'display_name', coalesce(rp.display_name, r.display_name, r.email), 'email', r.email, 'in_game_uid', r.in_game_uid,
         'branch', r.branch, 'section', r.section, 'year_of_study', r.year_of_study
-      ) order by case when r.role = 'leader' then 0 else 1 end, r.created_at) from public.registrations r where r.team_id = t.id), '[]'::jsonb)
+      ) order by case when r.role = 'leader' then 0 else 1 end, r.created_at) from public.registrations r left join public.profiles rp on rp.id = r.user_id where r.team_id = t.id), '[]'::jsonb)
     ) order by t.game_key, t.group_key, t.team_name) from public.teams t), '[]'::jsonb),
     'matches', coalesce((select jsonb_agg(jsonb_build_object(
       'id', m.id, 'game_key', m.game_key, 'group_key', m.group_key, 'title', m.title,

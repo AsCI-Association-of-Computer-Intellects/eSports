@@ -22,11 +22,11 @@ begin
         'year_of_study', mine.year_of_study, 'created_at', mine.created_at,
         'roster', (
           select jsonb_agg(jsonb_build_object(
-            'role', r.role, 'in_game_uid', r.in_game_uid, 'display_name', r.display_name,
+            'role', r.role, 'in_game_uid', r.in_game_uid, 'display_name', coalesce(rp.display_name, r.display_name, r.email),
             'email', r.email, 'branch', r.branch, 'section', r.section,
             'year_of_study', r.year_of_study, 'claimed', r.user_id is not null
           ) order by case when r.role = 'leader' then 0 else 1 end, r.created_at)
-          from public.registrations r where r.team_id = t.id
+          from public.registrations r left join public.profiles rp on rp.id = r.user_id where r.team_id = t.id
         )
       ) as ticket
       from public.registrations mine
