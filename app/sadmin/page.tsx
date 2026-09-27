@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Calendar, LogOut, Shield, Trophy } from 'lucide-react'
+import { Calendar, LogOut, Shield, Trophy, UserPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -42,6 +42,15 @@ type AdminMatch = {
 
 type MatchScore = { team_id: string; team_name: string; kills: number; finish_position: number; points: number }
 
+type NewTeamForm = {
+  gameKey: GameKey
+  groupKey: 'A' | 'B' | 'C' | 'D'
+  teamName: string
+  leaderName: string
+  leaderEmail: string
+  leaderUid: string
+}
+
 type MatchForm = {
   id: string | null
   gameKey: GameKey
@@ -56,6 +65,10 @@ const emptyMatch: MatchForm = {
   groupKey: 'A',
   scheduledAt: '',
   status: 'scheduled',
+}
+
+const emptyTeam: NewTeamForm = {
+  gameKey: 'freefire', groupKey: 'A', teamName: '', leaderName: '', leaderEmail: '', leaderUid: '',
 }
 
 function localDateTime(isoDate: string) {
@@ -76,6 +89,8 @@ export default function SAdminPage() {
   const [savingDetails, setSavingDetails] = useState<string | null>(null)
   const [savingMatch, setSavingMatch] = useState(false)
   const [matchForm, setMatchForm] = useState<MatchForm>(emptyMatch)
+  const [newTeam, setNewTeam] = useState<NewTeamForm>(emptyTeam)
+  const [savingNewTeam, setSavingNewTeam] = useState(false)
   const [teamGameFilter, setTeamGameFilter] = useState<GameKey | 'all'>('all')
   const [groupSearch, setGroupSearch] = useState('')
   const [matchScoreEdits, setMatchScoreEdits] = useState<Record<string, { kills: string; position: string }>>({})
@@ -190,6 +205,28 @@ export default function SAdminPage() {
     }
 
     setMatchForm(emptyMatch)
+    setError(null)
+    await loadDashboard()
+  }
+
+  const createTeam = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!supabase) return
+    setSavingNewTeam(true)
+    const { error: createError } = await supabase.rpc('admin_create_team', {
+      p_game_key: newTeam.gameKey,
+      p_group_key: newTeam.groupKey,
+      p_team_name: newTeam.teamName,
+      p_leader_name: newTeam.leaderName,
+      p_leader_email: newTeam.leaderEmail,
+      p_leader_uid: newTeam.leaderUid,
+    })
+    setSavingNewTeam(false)
+    if (createError) {
+      setError(createError.message.replace(/^.*ERROR:\s*/i, ''))
+      return
+    }
+    setNewTeam(emptyTeam)
     setError(null)
     await loadDashboard()
   }
@@ -329,6 +366,21 @@ export default function SAdminPage() {
             </section>
 
             <section className="space-y-8">
+              <div>
+                <div className="mb-5 flex items-end gap-3"><UserPlus size={20} className="text-accent-bright" /><div><div className="hud-label text-faint">ROSTER MANAGEMENT</div><h2 className="mt-2 text-2xl">Add a team</h2></div></div>
+                <form onSubmit={createTeam} className="rounded-panel border border-border bg-surface p-5 sm:p-6">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">Sport<select value={newTeam.gameKey} onChange={event => setNewTeam(current => ({ ...current, gameKey: event.target.value as GameKey }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink"><option value="freefire">Free Fire</option><option value="bgmi">BGMI</option><option value="codm">Call of Duty: Mobile</option></select></label>
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">Group<select value={newTeam.groupKey} onChange={event => setNewTeam(current => ({ ...current, groupKey: event.target.value as NewTeamForm['groupKey'] }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink">{['A', 'B', 'C', 'D'].map(group => <option key={group} value={group}>Group {group}</option>)}</select></label>
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted sm:col-span-2">Team name<input required value={newTeam.teamName} onChange={event => setNewTeam(current => ({ ...current, teamName: event.target.value }))} placeholder="e.g. BR T LxEsports" className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink" /></label>
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">Leader name<input required value={newTeam.leaderName} onChange={event => setNewTeam(current => ({ ...current, leaderName: event.target.value }))} placeholder="Full name" className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink" /></label>
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted">Leader email<input required type="email" value={newTeam.leaderEmail} onChange={event => setNewTeam(current => ({ ...current, leaderEmail: event.target.value }))} placeholder="leader@gmail.com" className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink" /></label>
+                    <label className="flex flex-col gap-2 text-xs font-semibold text-muted sm:col-span-2">Leader in-game UID<input required value={newTeam.leaderUid} onChange={event => setNewTeam(current => ({ ...current, leaderUid: event.target.value }))} placeholder="In-game UID" className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink" /></label>
+                  </div>
+                  <button type="submit" disabled={savingNewTeam} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-control bg-accent-gradient px-4 py-3 text-sm font-semibold text-[#04101f] disabled:opacity-60"><UserPlus size={15} /> {savingNewTeam ? 'Adding team…' : 'Add team'}</button>
+                  <p className="mt-3 text-xs text-muted">The leader must sign in with Google once before being added.</p>
+                </form>
+              </div>
               <div>
                 <div className="mb-5 flex items-end gap-3"><Calendar size={20} className="text-accent-bright" /><div><div className="hud-label text-faint">MATCH OPERATIONS</div><h2 className="mt-2 text-2xl">Schedule a group match</h2></div></div>
                 <form onSubmit={saveMatch} className="rounded-panel border border-border bg-surface p-5 sm:p-6">
