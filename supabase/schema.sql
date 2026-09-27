@@ -428,6 +428,7 @@ alter table public.matches add column if not exists team_b_id uuid references pu
 alter table public.matches drop column if exists group_a;
 alter table public.matches drop column if exists group_b;
 alter table public.teams add column if not exists eliminated_by_match_id uuid references public.matches (id) on delete set null;
+alter table public.registrations add column if not exists display_name text;
 
 create table if not exists public.team_scores (
   team_id uuid primary key references public.teams (id) on delete cascade,
@@ -470,7 +471,7 @@ as $$
         'team_id', t.id,
         'team_name', t.team_name,
         'game_key', t.game_key,
-        'team_lead_name', coalesce(leader_profile.display_name, lead.email, 'Team leader'),
+        'team_lead_name', coalesce(lead.display_name, leader_profile.display_name, lead.email, 'Team leader'),
         'score', coalesce(s.score, 0)
       )
       order by t.game_key, coalesce(s.score, 0) desc, t.team_name
@@ -539,6 +540,7 @@ begin
             select jsonb_agg(
               jsonb_build_object(
                 'role', r.role,
+                'display_name', r.display_name,
                 'email', r.email,
                 'in_game_uid', r.in_game_uid,
                 'branch', r.branch,
@@ -599,6 +601,45 @@ begin
   values (p_team_id, p_score, now())
   on conflict (team_id) do update
     set score = excluded.score, updated_at = now();
+end;
+$$;
+
+create or replace function public.update_team_details(
+  p_team_id uuid,
+  p_team_name text,
+  p_leader_email text,
+  p_leader_name text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_leader_user_id uuid;
+begin
+  if not public.is_admin() then
+    raise exception 'Admin access required';
+  end if;
+  if trim(coalesce(p_team_name, '')) = '' or trim(coalesce(p_leader_email, '')) = '' or trim(coalesce(p_leader_name, '')) = '' then
+    raise exception 'Team name, leader email, and leader name are required';
+  end if;
+
+  select user_id into v_leader_user_id
+  from public.registrations
+  where team_id = p_team_id and role = 'leader';
+  if not found then
+    raise exception 'Team leader not found';
+  end if;
+
+  update public.teams set team_name = trim(p_team_name) where id = p_team_id;
+  if not found then
+    raise exception 'Team not found';
+  end if;
+  update public.registrations
+  set email = lower(trim(p_leader_email)), display_name = trim(p_leader_name)
+  where team_id = p_team_id and role = 'leader';
+  update public.profiles set display_name = trim(p_leader_name) where id = v_leader_user_id;
 end;
 $$;
 
@@ -712,4 +753,24 @@ grant execute on function public.get_leaderboard(text) to anon, authenticated;
 grant execute on function public.get_match_schedule() to anon, authenticated;
 grant execute on function public.get_admin_dashboard() to authenticated;
 grant execute on function public.update_team_score(uuid, numeric) to authenticated;
+grant execute on function public.update_team_details(uuid, text, text, text) to authenticated;
+
+create or replace function public.prevent_closed_freefire_registration()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.game_key = 'freefire'
+     and now() >= timestamptz '2026-09-27 19:00:00+05:30' then
+    raise exception 'All The Slots are filled';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists block_closed_freefire_registration on public.teams;
+create trigger block_closed_freefire_registration
+  before insert on public.teams
+  for each row execute function public.prevent_closed_freefire_registration();
 grant execute on function public.save_match(uuid, text, uuid, uuid, text, text, timestamptz, text, uuid) to authenticated;

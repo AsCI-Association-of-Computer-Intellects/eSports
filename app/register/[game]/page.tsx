@@ -16,6 +16,7 @@ const inputClass =
   'rounded-control border border-border bg-bg-elevated px-3.5 py-3 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none'
 
 const whatsappCommunityUrl = 'https://chat.whatsapp.com/GGsrJqf2yVR0T59xoGXb46'
+const freeFireRegistrationDeadline = new Date('2026-09-27T19:00:00+05:30')
 
 function CollegeFields({ prefix, required }: { prefix: string; required: boolean }) {
   return (
@@ -61,6 +62,7 @@ export default function RegisterPage() {
   const gameKey = isGameKey(params.game) ? params.game : 'freefire'
   const game = games[gameKey]
   const memberSlots = game.rosterSize - 1 + game.substituteSlots
+  const freeFireRegistrationClosed = gameKey === 'freefire' && new Date() >= freeFireRegistrationDeadline
 
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -206,6 +208,19 @@ export default function RegisterPage() {
                 >
                   Join WhatsApp community <ArrowRight size={17} />
                 </a>
+                <Link
+                  href="/tickets"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-6 py-3.5 font-display text-[15px] font-semibold text-ink hover:border-border-strong"
+                >
+                  View tickets <ArrowRight size={17} />
+                </Link>
+              </>
+            ) : freeFireRegistrationClosed ? (
+              <>
+                <h2 className="text-[26px] leading-[1.08] sm:text-[32px]">
+                  All The Slots are <em className="not-italic text-accent-bright">filled.</em>
+                </h2>
+                <p className="-mt-2.5 text-sm">Free Fire registration is closed.</p>
                 <Link
                   href="/tickets"
                   className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-6 py-3.5 font-display text-[15px] font-semibold text-ink hover:border-border-strong"

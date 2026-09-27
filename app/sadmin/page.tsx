@@ -11,6 +11,7 @@ import { games, gameKeys, type GameKey } from '@/lib/games'
 
 type RosterMember = {
   role: string
+  display_name: string | null
   email: string | null
   in_game_uid: string
   branch: string | null
@@ -74,7 +75,9 @@ export default function SAdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [scoreEdits, setScoreEdits] = useState<Record<string, string>>({})
+  const [teamEdits, setTeamEdits] = useState<Record<string, { teamName: string; leaderEmail: string; leaderName: string }>>({})
   const [savingTeam, setSavingTeam] = useState<string | null>(null)
+  const [savingDetails, setSavingDetails] = useState<string | null>(null)
   const [savingMatch, setSavingMatch] = useState(false)
   const [matchForm, setMatchForm] = useState<MatchForm>(emptyMatch)
   const [teamGameFilter, setTeamGameFilter] = useState<GameKey | 'all'>('all')
@@ -109,6 +112,10 @@ export default function SAdminPage() {
     setTeams(nextTeams)
     setMatches(Array.isArray(dashboard.matches) ? dashboard.matches : [])
     setScoreEdits(Object.fromEntries(nextTeams.map(team => [team.team_id, String(team.score)])))
+    setTeamEdits(Object.fromEntries(nextTeams.map(team => {
+      const leader = team.roster.find(member => member.role === 'leader')
+      return [team.team_id, { teamName: team.team_name, leaderEmail: leader?.email || '', leaderName: leader?.display_name || 'Team leader' }]
+    })))
     setError(null)
     setLoading(false)
   }
@@ -141,6 +148,30 @@ export default function SAdminPage() {
       return
     }
     setTeams(current => current.map(team => (team.team_id === teamId ? { ...team, score } : team)))
+    setError(null)
+  }
+
+  const updateTeamDetails = async (teamId: string) => {
+    if (!supabase) return
+    const details = teamEdits[teamId]
+    if (!details) return
+    setSavingDetails(teamId)
+    const { error: detailsError } = await supabase.rpc('update_team_details', {
+      p_team_id: teamId,
+      p_team_name: details.teamName,
+      p_leader_email: details.leaderEmail,
+      p_leader_name: details.leaderName,
+    })
+    setSavingDetails(null)
+    if (detailsError) {
+      setError(detailsError.message.replace(/^.*ERROR:\s*/i, ''))
+      return
+    }
+    setTeams(current => current.map(team => team.team_id === teamId ? {
+      ...team,
+      team_name: details.teamName,
+      roster: team.roster.map(member => member.role === 'leader' ? { ...member, email: details.leaderEmail, display_name: details.leaderName } : member),
+    } : team))
     setError(null)
   }
 
@@ -254,6 +285,23 @@ export default function SAdminPage() {
                       </div>
                     </summary>
                     <div className="mt-4 border-t border-border pt-4">
+                      <div className="mb-5 grid grid-cols-1 gap-3 rounded-control border border-border bg-bg-elevated/50 p-4 sm:grid-cols-3">
+                        <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
+                          Team name
+                          <input value={teamEdits[team.team_id]?.teamName || ''} onChange={event => setTeamEdits(current => ({ ...current, [team.team_id]: { ...current[team.team_id], teamName: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none" />
+                        </label>
+                        <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
+                          Leader name
+                          <input value={teamEdits[team.team_id]?.leaderName || ''} onChange={event => setTeamEdits(current => ({ ...current, [team.team_id]: { ...current[team.team_id], leaderName: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none" />
+                        </label>
+                        <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
+                          Leader email
+                          <input type="email" value={teamEdits[team.team_id]?.leaderEmail || ''} onChange={event => setTeamEdits(current => ({ ...current, [team.team_id]: { ...current[team.team_id], leaderEmail: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none" />
+                        </label>
+                        <button type="button" onClick={() => void updateTeamDetails(team.team_id)} disabled={savingDetails === team.team_id} className="inline-flex items-center justify-center rounded-control border border-accent/40 bg-accent-soft px-4 py-2.5 text-sm font-semibold text-accent-bright disabled:opacity-60 sm:col-span-3">
+                          {savingDetails === team.team_id ? 'Saving team details…' : 'Save team details'}
+                        </button>
+                      </div>
                       <div className="mb-4 flex flex-wrap items-end gap-3">
                         <label className="flex flex-col gap-2 text-xs font-semibold text-muted">
                           Score
@@ -278,7 +326,7 @@ export default function SAdminPage() {
                       <ul className="space-y-2 text-sm">
                         {team.roster.map(member => (
                           <li key={`${team.team_id}-${member.in_game_uid}`} className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-2 first:border-t-0">
-                            <span className="text-ink">{member.email || 'No email'} <span className="text-muted">· {member.role}</span></span>
+                            <span className="text-ink">{member.display_name || member.email || 'No name'} <span className="text-muted">· {member.email || 'No email'} · {member.role}</span></span>
                             <span className="text-xs text-muted">UID {member.in_game_uid}</span>
                           </li>
                         ))}
