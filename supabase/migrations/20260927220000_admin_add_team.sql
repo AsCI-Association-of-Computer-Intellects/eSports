@@ -1,3 +1,5 @@
+alter table public.teams drop constraint if exists teams_game_key_leader_id_key;
+
 create or replace function public.admin_create_team(
   p_game_key text,
   p_group_key text,

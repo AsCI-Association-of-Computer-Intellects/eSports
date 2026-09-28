@@ -409,6 +409,8 @@ create table if not exists public.admin_users (
   created_at timestamptz not null default now()
 );
 
+alter table public.teams drop constraint if exists teams_game_key_leader_id_key;
+
 create table if not exists public.matches (
   id uuid primary key default gen_random_uuid(),
   game_key text not null check (game_key in ('freefire', 'bgmi', 'codm')),
