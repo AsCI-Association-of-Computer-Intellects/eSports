@@ -405,7 +405,7 @@ export default function SAdminPage() {
                     <label className="flex flex-col gap-2 text-xs font-semibold text-muted sm:col-span-2">Leader in-game UID<input required value={newTeam.leaderUid} onChange={event => setNewTeam(current => ({ ...current, leaderUid: event.target.value }))} placeholder="In-game UID" className="rounded-control border border-border bg-bg-elevated px-3 py-2.5 text-sm text-ink" /></label>
                   </div>
                   <button type="submit" disabled={savingNewTeam} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-control bg-accent-gradient px-4 py-3 text-sm font-semibold text-[#04101f] disabled:opacity-60"><UserPlus size={15} /> {savingNewTeam ? 'Adding team…' : 'Add team'}</button>
-                  <p className="mt-3 text-xs text-muted">The leader must sign in with Google once before being added.</p>
+                  <p className="mt-3 text-xs text-muted">The leader can sign in later to claim this roster spot.</p>
                 </form>
               </div>
               <div>
