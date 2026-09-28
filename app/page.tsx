@@ -315,7 +315,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Live leaderboard */}
+      {/* Live leaderboard - Hidden for now */}
+      {false && (
       <section id="leaderboard" className="mx-auto max-w-[1320px] px-5 py-12 sm:px-8 md:py-16 lg:px-16">
         <div className="mb-7 flex items-end justify-between gap-5">
           <div>
@@ -354,6 +355,7 @@ export default function HomePage() {
           </div>
         )}
       </section>
+      )}
 
       {/* Team competition */}
       <section className="relative border-b border-border bg-bg-elevated/55 px-5 py-12 sm:px-8 md:py-16 lg:px-16">
