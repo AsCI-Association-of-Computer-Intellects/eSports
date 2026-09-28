@@ -76,6 +76,19 @@ export default function HomePage() {
       setSchedule(Array.isArray(scheduleData) ? (scheduleData as PublicMatch[]) : [])
     }
     void loadCompetitionData()
+
+    const channel = supabase.channel('public_updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_scores' }, () => {
+        void loadCompetitionData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => {
+        void loadCompetitionData()
+      })
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
   }, [supabase, leaderboardGame, leaderboardGroup])
 
   return (

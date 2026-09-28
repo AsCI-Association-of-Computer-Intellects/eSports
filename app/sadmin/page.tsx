@@ -252,7 +252,7 @@ export default function SAdminPage() {
     await loadDashboard()
   }
 
-  const visibleTeams = teamGameFilter === 'all' ? teams : teams.filter(team => team.game_key === teamGameFilter)
+  const visibleTeams = (teamGameFilter === 'all' ? teams : teams.filter(team => team.game_key === teamGameFilter)).sort((a, b) => b.score - a.score)
   const groupTeams = teams.filter(team => team.game_key === matchForm.gameKey && team.group_key === matchForm.groupKey && !team.eliminated_by_match_id && team.team_name.toLowerCase().includes(groupSearch.trim().toLowerCase()))
 
   const saveMatchScore = async (matchId: string, teamId: string) => {
@@ -266,6 +266,21 @@ export default function SAdminPage() {
       p_finish_position: Number(edit.position),
     })
     if (scoreError) setError(scoreError.message.replace(/^.*ERROR:\s*/i, ''))
+    else await loadDashboard()
+  }
+
+  const markMatchAsComplete = async (matchId: string) => {
+    if (!supabase) return
+    const match = matches.find(m => m.id === matchId)
+    if (!match) return
+    const { error: matchError } = await supabase.rpc('save_match', {
+      p_match_id: match.id,
+      p_game_key: match.game_key,
+      p_group_key: match.group_key,
+      p_scheduled_at: match.scheduled_at,
+      p_status: 'completed',
+    })
+    if (matchError) setError(matchError.message.replace(/^.*ERROR:\s*/i, ''))
     else await loadDashboard()
   }
 
@@ -338,7 +353,7 @@ export default function SAdminPage() {
                       <div className="flex flex-wrap items-center gap-3">
                         <span className="font-display text-[11px] font-bold uppercase tracking-widest text-accent-bright">{games[team.game_key].name}</span>
                         <h3 className="text-lg">{team.team_name}</h3>
-                        <span className="ml-auto text-xs text-muted">{team.roster.length} players</span>
+                        <span className="ml-auto flex items-center gap-2"><span className="font-display text-sm font-bold text-accent-bright">{team.score} PTS</span><span className="text-xs text-muted">· {team.roster.length} players</span></span>
                         {team.eliminated_by_match_id && <span className="border border-red-400/30 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300">Eliminated</span>}
                       </div>
                     </summary>
@@ -427,8 +442,8 @@ export default function SAdminPage() {
                 <div className="mb-4 flex items-center gap-2"><Trophy size={18} className="text-accent-bright" /><h2 className="text-xl">Matches and scoring</h2></div>
                 <div className="space-y-3">
                   {matches.map(match => <div key={match.id} className="rounded-control border border-border bg-surface p-4">
-                    <div className="flex items-start justify-between gap-3"><div><div className="font-display text-[10px] font-bold uppercase tracking-widest text-accent-bright">{games[match.game_key].name} · GROUP {match.group_key}</div><h3 className="mt-1 text-base">{match.title}</h3><p className="mt-1 text-xs text-muted">{new Date(match.scheduled_at).toLocaleString()} · {match.status}</p></div><button type="button" onClick={() => setMatchForm({ id: match.id, gameKey: match.game_key, groupKey: match.group_key, scheduledAt: localDateTime(match.scheduled_at), status: match.status })} className="text-xs font-semibold text-accent-bright">Edit</button></div>
-                    {match.status === 'completed' && <div className="mt-4 space-y-2 border-t border-border pt-3">{match.scores.map(score => { const key = `${match.id}:${score.team_id}`; const edit = matchScoreEdits[key] || { kills: String(score.kills), position: String(score.finish_position) }; return <div key={score.team_id} className="grid grid-cols-[1fr_70px_70px_auto] items-end gap-2 text-xs"><span className="pb-2 text-ink">{score.team_name}</span><input type="number" min="0" value={edit.kills} onChange={event => setMatchScoreEdits(current => ({ ...current, [key]: { ...edit, kills: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-ink" placeholder="Kills" /><input type="number" min="1" value={edit.position} onChange={event => setMatchScoreEdits(current => ({ ...current, [key]: { ...edit, position: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-ink" placeholder="Place" /><button type="button" onClick={() => void saveMatchScore(match.id, score.team_id)} className="rounded-control border border-accent/40 px-2 py-2 text-accent-bright">Save</button></div> })}</div>}
+                    <div className="flex items-start justify-between gap-3"><div><div className="font-display text-[10px] font-bold uppercase tracking-widest text-accent-bright">{games[match.game_key].name} · GROUP {match.group_key}</div><h3 className="mt-1 text-base">{match.title}</h3><p className="mt-1 text-xs text-muted">{new Date(match.scheduled_at).toLocaleString()} · {match.status}</p></div><div className="flex items-center gap-3">{match.status !== 'completed' && <button type="button" onClick={() => void markMatchAsComplete(match.id)} className="text-xs font-semibold text-accent-bright">Mark Complete</button>}<button type="button" onClick={() => setMatchForm({ id: match.id, gameKey: match.game_key, groupKey: match.group_key, scheduledAt: localDateTime(match.scheduled_at), status: match.status })} className="text-xs font-semibold text-accent-bright">Edit</button></div></div>
+                    {match.status === 'completed' && <div className="mt-4 space-y-2 border-t border-border pt-3">{match.scores.map(score => { const key = `${match.id}:${score.team_id}`; const defaultPos = score.points === 0 || score.finish_position > 3 ? '999' : String(score.finish_position); const edit = matchScoreEdits[key] || { kills: String(score.kills), position: defaultPos }; return <div key={score.team_id} className="grid grid-cols-[1fr_70px_80px_auto] items-end gap-2 text-xs"><span className="pb-2 text-ink">{score.team_name}</span><input type="number" min="0" value={edit.kills} onChange={event => setMatchScoreEdits(current => ({ ...current, [key]: { ...edit, kills: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-ink" placeholder="Kills" /><select value={edit.position} onChange={event => setMatchScoreEdits(current => ({ ...current, [key]: { ...edit, position: event.target.value } }))} className="rounded-control border border-border bg-bg-elevated px-2 py-2 text-ink"><option value="999">N/A</option><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option></select><button type="button" onClick={() => void saveMatchScore(match.id, score.team_id)} className="rounded-control border border-accent/40 px-2 py-2 text-accent-bright">Save</button></div> })}</div>}
                   </div>)}
                   {matches.length === 0 && <p className="text-sm text-muted">No matches scheduled yet.</p>}
                 </div>
