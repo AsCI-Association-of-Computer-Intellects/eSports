@@ -24,6 +24,16 @@ begin
     raise exception 'Team name, leader name, email, and UID are required';
   end if;
 
+  if exists (select 1 from public.teams where game_key = p_game_key and lower(team_name) = lower(trim(p_team_name))) then
+    raise exception 'This team name is already registered for this sport';
+  end if;
+  if exists (select 1 from public.registrations where game_key = p_game_key and lower(email) = v_email) then
+    raise exception 'This leader email is already registered for this sport';
+  end if;
+  if exists (select 1 from public.registrations where game_key = p_game_key and lower(in_game_uid) = lower(trim(p_leader_uid))) then
+    raise exception 'This leader UID is already registered for this sport';
+  end if;
+
   select id into v_leader_id from public.profiles where lower(email) = v_email;
   v_registration_user_id := v_leader_id;
   if v_leader_id is null then v_leader_id := auth.uid(); end if;
@@ -39,7 +49,7 @@ begin
   return v_team_id;
 exception
   when unique_violation then
-    raise exception 'This team name, email, or UID is already registered for this sport';
+    raise exception 'A team name, email, or UID already exists for this sport';
 end;
 $$;
 
